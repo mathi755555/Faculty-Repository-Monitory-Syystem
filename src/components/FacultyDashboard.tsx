@@ -14,7 +14,8 @@ import {
   LogOut,
   BookOpen,
   UserCheck,
-  User
+  User,
+  Building2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import FDPForm from "@/components/forms/FDPForm";
@@ -27,6 +28,7 @@ import TimetableForm from "@/components/forms/TimetableForm";
 import MembershipForm from "@/components/forms/MembershipForm";
 import StudentProjectForm from "@/components/forms/StudentProjectForm";
 import TeachingMaterialForm from "@/components/forms/TeachingMaterialForm";
+import { motion } from "framer-motion";
 
 interface FacultyDashboardProps {
   onLogout: () => void;
@@ -78,7 +80,6 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch user profile
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('full_name, email, department, designation')
@@ -87,7 +88,6 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // If profile doesn't exist, create one
         if (error.code === 'PGRST116') {
           const { error: insertError } = await supabase
             .from('profiles')
@@ -247,26 +247,32 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <motion.header 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white shadow-sm border-b"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <GraduationCap className="h-8 w-8 text-indigo-600" />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Faculty Portal</h1>
-                <p className="text-sm text-gray-600">
-                  {userProfile?.full_name || 'Faculty Member'}
-                  {userProfile?.department && ` • ${userProfile.department}`}
-                  {userProfile?.designation && ` • ${userProfile.designation}`}
-                </p>
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <User className="h-4 w-4" />
+                  <span>{userProfile?.full_name}</span>
+                  {userProfile?.department && (
+                    <>
+                      <Building2 className="h-4 w-4" />
+                      <span>{userProfile.department}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="h-4 w-4 text-gray-600" />
-                <span className="text-sm text-gray-600">{userProfile?.email}</span>
-              </div>
-              <Badge variant="secondary">Faculty</Badge>
+              <Badge variant="secondary">{userProfile?.designation || 'Faculty'}</Badge>
               <Button variant="outline" onClick={onLogout} className="flex items-center space-x-2">
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
@@ -274,7 +280,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
             </div>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -294,31 +300,41 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard Overview</h2>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome, {userProfile?.full_name}</h2>
               <p className="text-gray-600">Manage your academic and research activities</p>
-            </div>
+            </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {modules.map((module) => (
-                <Card 
-                  key={module.id} 
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => setActiveTab(module.id)}
+              {modules.map((module, index) => (
+                <motion.div
+                  key={module.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className={`p-2 rounded-lg ${module.color}`}>
-                        <module.icon className="h-5 w-5 text-white" />
+                  <Card 
+                    className="hover:shadow-lg transition-shadow cursor-pointer group"
+                    onClick={() => setActiveTab(module.id)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className={`p-2 rounded-lg ${module.color} transform group-hover:scale-110 transition-transform`}>
+                          <module.icon className="h-5 w-5 text-white" />
+                        </div>
+                        <Badge variant="secondary">{module.count}</Badge>
                       </div>
-                      <Badge variant="secondary">{module.count}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardTitle className="text-lg mb-1">{module.title}</CardTitle>
-                    <CardDescription>{module.description}</CardDescription>
-                  </CardContent>
-                </Card>
+                    </CardHeader>
+                    <CardContent>
+                      <CardTitle className="text-lg mb-1">{module.title}</CardTitle>
+                      <CardDescription>{module.description}</CardDescription>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               ))}
             </div>
           </TabsContent>
