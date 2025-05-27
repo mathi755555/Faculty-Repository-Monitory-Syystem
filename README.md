@@ -87,5 +87,5 @@ This project is maintained by the Academia Team.
 See [LICENSE](LICENSE) for more information.
 
 ---
-**Note:** This project is not affiliated with Lovable or any AI code generation service. All code and content are tailored for academic use.
+**Note:** This project is not affiliated with any AI code generation service. All code and content are tailored for academic use.
 
