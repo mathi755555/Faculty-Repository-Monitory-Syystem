@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,19 +31,53 @@ const FDPForm = () => {
     description: '',
     certificate: null as File | null
   });
-
   const [fdpCertifications, setFdpCertifications] = useState<FDPCertification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchFDPCertifications();
+    checkAuthAndFetchData();
   }, []);
 
-  const fetchFDPCertifications = async () => {
+  const checkAuthAndFetchData = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to access your FDP certifications.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!user) {
+        toast({
+          title: "Not Authenticated",
+          description: "Please log in to access your FDP certifications.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCurrentUser(user);
+      await fetchFDPCertifications(user.id);
+    } catch (error: any) {
+      toast({
+        title: "Error checking authentication",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchFDPCertifications = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('fdp_certifications')
         .select('*')
+        .eq('user_id', userId) // Filter by current user's ID
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -69,18 +102,23 @@ const FDPForm = () => {
       return;
     }
 
+    if (!currentUser) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to add FDP certifications.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
-
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
       let certificateUrl = null;
 
       // Upload certificate if provided
       if (formData.certificate) {
         const fileExt = formData.certificate.name.split('.').pop();
-        const fileName = `${user.id}/fdp/${Date.now()}.${fileExt}`;
+        const fileName = `${currentUser.id}/fdp/${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('academic-files')
@@ -98,7 +136,7 @@ const FDPForm = () => {
       const { error } = await supabase
         .from('fdp_certifications')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           title: formData.title,
           organizer: formData.organizer,
           duration_from: format(formData.fromDate, "yyyy-MM-dd"),
@@ -117,8 +155,7 @@ const FDPForm = () => {
         certificate: null
       });
 
-      await fetchFDPCertifications();
-
+      await fetchFDPCertifications(currentUser.id);
       toast({
         title: "FDP Certification Added",
         description: "Your certification has been saved successfully.",
@@ -140,6 +177,17 @@ const FDPForm = () => {
       setFormData({ ...formData, certificate: file });
     }
   };
+
+  // Show loading or authentication message if user is not loaded
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading your FDP certifications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
