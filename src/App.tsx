@@ -94,7 +94,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod" replace />
+                    <Navigate to="/hod\" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -108,7 +108,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod" replace />
+                    <Navigate to="/hod\" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -122,7 +122,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod" replace />
+                    <Navigate to="/hod\" replace />
                   ) : (
                     <FacultyDashboard onLogout={handleLogout} />
                   )
