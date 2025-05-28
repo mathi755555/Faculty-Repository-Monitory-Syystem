@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,7 +15,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [designation, setDesignation] = useState<string | null>(null);
+  const [isHOD, setIsHOD] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +27,12 @@ const App = () => {
       if (user) {
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("designation")
+          .select("email")
           .eq("id", user.id)
           .single();
 
-        if (!error) {
-          setDesignation(profile.designation);
+        if (!error && profile) {
+          setIsHOD(profile.email === "kaileshwar2005@gmail.com");
         }
       }
 
@@ -49,15 +48,15 @@ const App = () => {
       if (user) {
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("designation")
+          .select("email")
           .eq("id", user.id)
           .single();
 
-        if (!error) {
-          setDesignation(profile.designation);
+        if (!error && profile) {
+          setIsHOD(profile.email === "kaileshwar2005@gmail.com");
         }
       } else {
-        setDesignation(null);
+        setIsHOD(false);
       }
 
       setLoading(false);
@@ -69,7 +68,7 @@ const App = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setDesignation(null);
+    setIsHOD(false);
   };
 
   if (loading) {
@@ -94,7 +93,7 @@ const App = () => {
               path="/"
               element={
                 user ? (
-                  designation === "HOD" ? (
+                  isHOD ? (
                     <Navigate to="/hod" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -108,7 +107,7 @@ const App = () => {
               path="/auth"
               element={
                 user ? (
-                  designation === "HOD" ? (
+                  isHOD ? (
                     <Navigate to="/hod" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -122,7 +121,7 @@ const App = () => {
               path="/dashboard"
               element={
                 user ? (
-                  designation === "HOD" ? (
+                  isHOD ? (
                     <Navigate to="/hod" replace />
                   ) : (
                     <FacultyDashboard onLogout={handleLogout} />
@@ -136,7 +135,7 @@ const App = () => {
               path="/hod"
               element={
                 user ? (
-                  designation === "HOD" ? (
+                  isHOD ? (
                     <HODDashboard onLogout={handleLogout} />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -154,6 +153,3 @@ const App = () => {
 };
 
 export default App;
-
-
-//updated v1
