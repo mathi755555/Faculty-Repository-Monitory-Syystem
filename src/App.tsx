@@ -16,7 +16,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 30000,
-      refetchOnWindowFocus: false
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false
     }
   }
 });
@@ -26,44 +28,82 @@ const App = () => {
   const [isHOD, setIsHOD] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
-    const getSessionAndProfile = async () => {
+    const initializeAuth = async () => {
       try {
+        setLoading(true);
+        setSessionError(null);
+
+        // Get initial session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          throw sessionError;
-        }
-
+        if (sessionError) throw sessionError;
         if (!mounted) return;
 
-        const user = session?.user ?? null;
-        setUser(user);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
 
-        if (user) {
+        if (currentUser) {
           const { data: profile, error: profileError } = await supabase
             .from("profiles")
             .select("email")
-            .eq("id", user.id)
+            .eq("id", currentUser.id)
             .single();
 
           if (profileError) {
-            throw profileError;
+            if (profileError.code === "PGRST116") {
+              // Profile doesn't exist, create it
+              await supabase.from("profiles").insert({
+                id: currentUser.id,
+                email: currentUser.email,
+                full_name: currentUser.user_metadata?.full_name || currentUser.email
+              });
+            } else {
+              throw profileError;
+            }
           }
 
           if (!mounted) return;
-
-          if (profile) {
-            setIsHOD(profile.email === "kaileshwar2005@gmail.com");
-          }
+          setIsHOD(profile?.email === "kaileshwar2005@gmail.com");
         }
+
+        // Set up auth state change subscription
+        authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (!mounted) return;
+
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+
+          if (currentUser) {
+            try {
+              const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("email")
+                .eq("id", currentUser.id)
+                .single();
+
+              if (profileError) throw profileError;
+              if (!mounted) return;
+
+              setIsHOD(profile?.email === "kaileshwar2005@gmail.com");
+            } catch (error) {
+              console.error("Profile fetch error:", error);
+              setIsHOD(false);
+            }
+          } else {
+            setIsHOD(false);
+          }
+        });
+
       } catch (error) {
         if (!mounted) return;
-        console.error("Session/Profile error:", error);
-        setSessionError(error instanceof Error ? error.message : "Failed to load user session");
+        console.error("Auth initialization error:", error);
+        setSessionError(error instanceof Error ? error.message : "Failed to initialize authentication");
       } finally {
         if (mounted) {
           setLoading(false);
@@ -71,50 +111,13 @@ const App = () => {
       }
     };
 
-    getSessionAndProfile();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-
-      try {
-        const user = session?.user ?? null;
-        setUser(user);
-
-        if (user) {
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("email")
-            .eq("id", user.id)
-            .single();
-
-          if (profileError) {
-            throw profileError;
-          }
-
-          if (!mounted) return;
-
-          if (profile) {
-            setIsHOD(profile.email === "kaileshwar2005@gmail.com");
-          }
-        } else {
-          setIsHOD(false);
-        }
-      } catch (error) {
-        if (!mounted) return;
-        console.error("Auth state change error:", error);
-        setSessionError(error instanceof Error ? error.message : "Failed to update user session");
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    });
+    initializeAuth();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      authSubscription?.unsubscribe();
     };
-  }, []);
+  }, [retryCount]); // Add retryCount to dependencies to allow manual retry
 
   const handleLogout = async () => {
     try {
@@ -122,10 +125,15 @@ const App = () => {
       setUser(null);
       setIsHOD(false);
       setSessionError(null);
+      queryClient.clear(); // Clear query cache on logout
     } catch (error) {
       console.error("Logout error:", error);
       setSessionError(error instanceof Error ? error.message : "Failed to sign out");
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(count => count + 1);
   };
 
   if (loading) {
@@ -133,7 +141,7 @@ const App = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Initializing application...</p>
         </div>
       </div>
     );
@@ -144,12 +152,12 @@ const App = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">Error: {sessionError}</p>
-          <button
-            onClick={() => window.location.reload()}
+          <Button
+            onClick={handleRetry}
             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -167,7 +175,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod\" replace />
+                    <Navigate to="/hod" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -181,7 +189,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod\" replace />
+                    <Navigate to="/hod" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -195,7 +203,7 @@ const App = () => {
               element={
                 user ? (
                   isHOD ? (
-                    <Navigate to="/hod\" replace />
+                    <Navigate to="/hod" replace />
                   ) : (
                     <FacultyDashboard onLogout={handleLogout} />
                   )
