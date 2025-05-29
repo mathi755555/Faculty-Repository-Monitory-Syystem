@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./components/Auth";
 import FacultyDashboard from "./components/FacultyDashboard";
 import HODDashboard from "./components/HODDashboard";
+import { Button } from "@/components/ui/button";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,16 +20,12 @@ const queryClient = new QueryClient({
       staleTime: 30000,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-      refetchOnReconnect: false
-    }
-  }
+      refetchOnReconnect: false,
+    },
+  },
 });
 
-console.log("App module loaded");
-
 const App = () => {
-  console.log("App rendered");
-
   const [user, setUser] = useState<User | null>(null);
   const [isHOD, setIsHOD] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
@@ -36,89 +33,42 @@ const App = () => {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-<<<<<<< HEAD
-    console.log("useEffect started");
-
-    let mounted = true;
-
-    const fetchProfile = async (user: User) => {
-      console.log("Fetching profile for user:", user.id);
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", user.id)
-        .single();
-
-      if (!error && profile && mounted) {
-        console.log("Profile fetched:", profile);
-        setIsHOD(profile.email === "kaileshwar2005@gmail.com");
-      } else if (error) {
-        console.error("Error fetching profile:", error);
-      }
-    };
-
-    const getSessionAndProfile = async () => {
-      console.log("Getting session");
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user ?? null;
-
-      if (!mounted) return;
-
-      console.log("Session user:", user);
-      setUser(user);
-
-      if (user) {
-        await fetchProfile(user);
-      } else {
-        setIsHOD(false);
-      }
-
-      setLoading(false);
-      console.log("Loading set to false after session fetch");
-    };
-
-    getSessionAndProfile();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-
-      const user = session?.user ?? null;
-      console.log("Auth state changed. User:", user);
-      setUser(user);
-
-      if (user) {
-        await fetchProfile(user);
-      } else {
-        setIsHOD(false);
-      }
-
-      // Do NOT set loading here to avoid flicker
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-      console.log("Cleanup: unsubscribed");
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    console.log("Logging out");
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsHOD(false);
-=======
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
+
+    const fetchProfile = async (user: User) => {
+      try {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", user.id)
+          .single();
+
+        if (error && error.code === "PGRST116") {
+          // Profile doesn't exist, create one
+          await supabase.from("profiles").insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email,
+          });
+          setIsHOD(user.email === "kaileshwar2005@gmail.com");
+        } else if (error) {
+          console.error("Error fetching profile:", error);
+        } else if (profile && mounted) {
+          setIsHOD(profile.email === "kaileshwar2005@gmail.com");
+        }
+      } catch (err) {
+        console.error("Unhandled error fetching profile:", err);
+      }
+    };
 
     const initializeAuth = async () => {
       try {
         setLoading(true);
         setSessionError(null);
 
-        // Get initial session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) throw sessionError;
         if (!mounted) return;
 
@@ -126,65 +76,29 @@ const App = () => {
         setUser(currentUser);
 
         if (currentUser) {
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("email")
-            .eq("id", currentUser.id)
-            .single();
-
-          if (profileError) {
-            if (profileError.code === "PGRST116") {
-              // Profile doesn't exist, create it
-              await supabase.from("profiles").insert({
-                id: currentUser.id,
-                email: currentUser.email,
-                full_name: currentUser.user_metadata?.full_name || currentUser.email
-              });
-            } else {
-              throw profileError;
-            }
-          }
-
-          if (!mounted) return;
-          setIsHOD(profile?.email === "kaileshwar2005@gmail.com");
+          await fetchProfile(currentUser);
+        } else {
+          setIsHOD(false);
         }
 
-        // Set up auth state change subscription
-        authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+        authSubscription = supabase.auth.onAuthStateChange(async (_event, session) => {
           if (!mounted) return;
 
-          const currentUser = session?.user ?? null;
-          setUser(currentUser);
+          const user = session?.user ?? null;
+          setUser(user);
 
-          if (currentUser) {
-            try {
-              const { data: profile, error: profileError } = await supabase
-                .from("profiles")
-                .select("email")
-                .eq("id", currentUser.id)
-                .single();
-
-              if (profileError) throw profileError;
-              if (!mounted) return;
-
-              setIsHOD(profile?.email === "kaileshwar2005@gmail.com");
-            } catch (error) {
-              console.error("Profile fetch error:", error);
-              setIsHOD(false);
-            }
+          if (user) {
+            await fetchProfile(user);
           } else {
             setIsHOD(false);
           }
         });
 
       } catch (error) {
-        if (!mounted) return;
         console.error("Auth initialization error:", error);
         setSessionError(error instanceof Error ? error.message : "Failed to initialize authentication");
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     };
 
@@ -194,7 +108,7 @@ const App = () => {
       mounted = false;
       authSubscription?.unsubscribe();
     };
-  }, [retryCount]); // Add retryCount to dependencies to allow manual retry
+  }, [retryCount]);
 
   const handleLogout = async () => {
     try {
@@ -202,7 +116,7 @@ const App = () => {
       setUser(null);
       setIsHOD(false);
       setSessionError(null);
-      queryClient.clear(); // Clear query cache on logout
+      queryClient.clear();
     } catch (error) {
       console.error("Logout error:", error);
       setSessionError(error instanceof Error ? error.message : "Failed to sign out");
@@ -211,11 +125,9 @@ const App = () => {
 
   const handleRetry = () => {
     setRetryCount(count => count + 1);
->>>>>>> 41adc392ade839b9d46e82881467d64c39707f17
   };
 
   if (loading) {
-    console.log("Rendering loading screen");
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -241,8 +153,6 @@ const App = () => {
       </div>
     );
   }
-
-  console.log("Rendering main app, user:", user, "isHOD:", isHOD);
 
   return (
     <QueryClientProvider client={queryClient}>
