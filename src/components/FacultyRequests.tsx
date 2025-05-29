@@ -175,7 +175,7 @@ const FacultyRequests = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary" className="flex items-center gap-1">
+        return <Badge variant="secondary\" className="flex items-center gap-1">
           <Clock className="h-3 w-3" /> Pending
         </Badge>;
       case 'approved':

@@ -400,3 +400,5 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
 };
 
 export default FacultyDashboard;
+
+export default FacultyDashboard
