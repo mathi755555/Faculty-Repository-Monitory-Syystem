@@ -334,11 +334,50 @@ const FacultyDataView = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent> 
+        <TabsContent value="fdp">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Briefcase className="h-5 w-5" />
+                  <span>Funded Projects</span>
+                </div>
+                <Badge variant="secondary">{filteredProjects.length} entries</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredProjects.map((project) => (
+                  <div key={project.id} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{project.title}</h4>
+                        <p className="text-sm text-gray-600">{project.funding_agency}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-600">{project.profiles?.full_name || 'Unknown Faculty'}</span>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Amount: ₹{project.funded_amount?.toLocaleString()}</span>
+                      <span>
+                        Duration: {format(new Date(project.duration_from), "yyyy")} - {format(new Date(project.duration_to), "yyyy")}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {filteredProjects.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No projects found</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
-        <div>
-          fdp
-        </div>
-          
         <TabsContent value="projects">
           <Card>
             <CardHeader>
