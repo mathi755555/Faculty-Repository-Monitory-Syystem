@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,14 +31,34 @@ const MembershipForm = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchMemberships();
+    checkAuthAndFetchMemberships();
   }, []);
 
-  const fetchMemberships = async () => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const checkAuthAndFetchMemberships = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+        setCurrentUser(null);
+        setMemberships([]);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchMemberships(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+      setMemberships([]);
+    }
+  };
+
+  const fetchMemberships = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('memberships')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -55,7 +74,7 @@ const MembershipForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.bodyName || !formData.membershipId) {
       toast({
         title: "Please fill all required fields",
@@ -67,16 +86,15 @@ const MembershipForm = () => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!currentUser) throw new Error('User not authenticated');
 
       let certificateUrl = null;
 
       // Upload certificate if provided
       if (formData.certificate) {
         const fileExt = formData.certificate.name.split('.').pop();
-        const fileName = `${user.id}/memberships/${Date.now()}.${fileExt}`;
-        
+        const fileName = `${currentUser.id}/memberships/${Date.now()}.${fileExt}`;
+
         const { error: uploadError } = await supabase.storage
           .from('academic-files')
           .upload(fileName, formData.certificate);
@@ -93,7 +111,7 @@ const MembershipForm = () => {
       const { error } = await supabase
         .from('memberships')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           professional_body_name: formData.bodyName,
           membership_id: formData.membershipId,
           expiry_date: formData.expiryDate?.toISOString().split('T')[0] || null,
@@ -109,7 +127,7 @@ const MembershipForm = () => {
         certificate: null
       });
 
-      await fetchMemberships();
+      await fetchMemberships(currentUser.id);
 
       toast({
         title: "Membership Added",

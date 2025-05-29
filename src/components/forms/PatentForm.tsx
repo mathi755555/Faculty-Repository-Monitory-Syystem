@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,16 +29,36 @@ const PatentForm = () => {
 
   const [patents, setPatents] = useState<Patent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchPatents();
+    checkAuthAndFetchPatents();
   }, []);
 
-  const fetchPatents = async () => {
+  const checkAuthAndFetchPatents = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log("Session:", session, "Error:", error);
+      const user = session?.user;
+      if (!user) {
+        setCurrentUser(null);
+        setPatents([]);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchPatents(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+      setPatents([]);
+    }
+  };
+
+  const fetchPatents = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('patents')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -55,7 +74,7 @@ const PatentForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title || !formData.status) {
       toast({
         title: "Please fill all required fields",
@@ -67,16 +86,15 @@ const PatentForm = () => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!currentUser) throw new Error('User not authenticated');
 
       let documentUrl = null;
 
       // Upload document if provided
       if (formData.documents) {
         const fileExt = formData.documents.name.split('.').pop();
-        const fileName = `${user.id}/patents/${Date.now()}.${fileExt}`;
-        
+        const fileName = `${currentUser.id}/patents/${Date.now()}.${fileExt}`;
+
         const { error: uploadError } = await supabase.storage
           .from('academic-files')
           .upload(fileName, formData.documents);
@@ -93,7 +111,7 @@ const PatentForm = () => {
       const { error } = await supabase
         .from('patents')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           title: formData.title,
           status: formData.status as 'Filed' | 'Granted',
           document_url: documentUrl
@@ -109,7 +127,7 @@ const PatentForm = () => {
         documents: null
       });
 
-      await fetchPatents();
+      await fetchPatents(currentUser.id);
 
       toast({
         title: "Patent Added",

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ const FacultyDataView = () => {
     fetchAllData();
     fetchFacultyMembers();
   }, []);
-  
+
   const fetchFacultyMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -334,50 +335,59 @@ const FacultyDataView = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent> 
-        <TabsContent value="fdp">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Briefcase className="h-5 w-5" />
-                  <span>Funded Projects</span>
-                </div>
-                <Badge variant="secondary">{filteredProjects.length} entries</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredProjects.map((project) => (
-                  <div key={project.id} className="border rounded-lg p-4 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-medium text-gray-900">{project.title}</h4>
-                        <p className="text-sm text-gray-600">{project.funding_agency}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">{project.profiles?.full_name || 'Unknown Faculty'}</span>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Amount: ₹{project.funded_amount?.toLocaleString()}</span>
-                      <span>
-                        Duration: {format(new Date(project.duration_from), "yyyy")} - {format(new Date(project.duration_to), "yyyy")}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {filteredProjects.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">No projects found</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
+<TabsContent value="fdp">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <GraduationCap className="h-5 w-5" />
+          <span>FDP Certifications</span>
+        </div>
+        <Badge variant="secondary">{filteredFdp.length} entries</Badge>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {filteredFdp.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm text-left border border-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 border-b">Title</th>
+                <th className="px-4 py-2 border-b">Organizer</th>
+                <th className="px-4 py-2 border-b">Faculty</th>
+                <th className="px-4 py-2 border-b">Duration</th>
+                <th className="px-4 py-2 border-b text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFdp.map((fdp) => (
+                <tr key={fdp.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 border-b">{fdp.title}</td>
+                  <td className="px-4 py-2 border-b">{fdp.organizer}</td>
+                  <td className="px-4 py-2 border-b">
+                    {fdp.profiles?.full_name || "Unknown Faculty"}
+                  </td>
+                  <td className="px-4 py-2 border-b">
+                    {format(new Date(fdp.duration_from), "MMM dd, yyyy")} -{" "}
+                    {format(new Date(fdp.duration_to), "MMM dd, yyyy")}
+                  </td>
+                  <td className="px-4 py-2 border-b text-center">
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-center text-gray-500 py-8">No FDP certifications found</p>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
         <TabsContent value="projects">
           <Card>
             <CardHeader>

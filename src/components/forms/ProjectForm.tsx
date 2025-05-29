@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,19 @@ import { format } from "date-fns";
 import { CalendarIcon, Upload, Plus, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Project {
+  id: string;
+  title: string;
+  funding_agency: string;
+  funded_amount: number;
+  duration_from: string;
+  duration_to: string;
+  sanction_letter_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const ProjectForm = () => {
   const [formData, setFormData] = useState({
@@ -23,26 +35,48 @@ const ProjectForm = () => {
     sanctionLetter: null as File | null
   });
 
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      title: "AI-based Educational Platform Development",
-      agency: "DST, Government of India",
-      amount: "₹15,00,000",
-      duration: "2023-2025",
-      status: "Active"
-    },
-    {
-      id: 2,
-      title: "Machine Learning for Healthcare Analytics",
-      agency: "SERB",
-      amount: "₹8,50,000",
-      duration: "2022-2024",
-      status: "Completed"
-    }
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    checkAuthAndFetchData();
+  }, []);
+
+  const checkAuthAndFetchData = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setCurrentUser(null);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchProjects(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+    }
+  };
+
+  const fetchProjects = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching projects",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.fundingAgency || !formData.amount) {
@@ -53,32 +87,65 @@ const ProjectForm = () => {
       return;
     }
 
-    const newProject = {
-      id: projects.length + 1,
-      title: formData.title,
-      agency: formData.fundingAgency,
-      amount: `₹${formData.amount}`,
-      duration: formData.fromDate && formData.toDate 
-        ? `${format(formData.fromDate, "yyyy")}-${format(formData.toDate, "yyyy")}`
-        : "TBD",
-      status: "Active"
-    };
+    try {
+      setLoading(true);
 
-    setProjects([newProject, ...projects]);
-    setFormData({
-      title: '',
-      fundingAgency: '',
-      amount: '',
-      fromDate: undefined,
-      toDate: undefined,
-      description: '',
-      sanctionLetter: null
-    });
+      let sanctionLetterUrl = null;
+      if (formData.sanctionLetter && currentUser) {
+        const fileExt = formData.sanctionLetter.name.split('.').pop();
+        const fileName = `${currentUser.id}/projects/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('academic-files')
+          .upload(fileName, formData.sanctionLetter);
 
-    toast({
-      title: "Project Added",
-      description: "Your funded project has been saved successfully.",
-    });
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('academic-files')
+          .getPublicUrl(fileName);
+
+        sanctionLetterUrl = publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('projects')
+        .insert({
+          user_id: currentUser.id,
+          title: formData.title,
+          funding_agency: formData.fundingAgency,
+          funded_amount: parseFloat(formData.amount),
+          duration_from: formData.fromDate ? formData.fromDate.toISOString() : null,
+          duration_to: formData.toDate ? formData.toDate.toISOString() : null,
+          sanction_letter_url: sanctionLetterUrl,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Project Added",
+        description: "Your funded project has been saved successfully.",
+      });
+
+      setFormData({
+        title: '',
+        fundingAgency: '',
+        amount: '',
+        fromDate: undefined,
+        toDate: undefined,
+        description: '',
+        sanctionLetter: null
+      });
+
+      fetchProjects(currentUser.id);
+    } catch (error: any) {
+      toast({
+        title: "Error adding project",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,6 +154,16 @@ const ProjectForm = () => {
       setFormData({ ...formData, sanctionLetter: file });
     }
   };
+
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading your projects...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -239,8 +316,8 @@ const ProjectForm = () => {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full">
-                Add Project
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Adding Project..." : "Add Project"}
               </Button>
             </form>
           </CardContent>
@@ -263,18 +340,27 @@ const ProjectForm = () => {
                 <div key={project.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between">
                     <h4 className="font-medium text-gray-900">{project.title}</h4>
-                    <span className={cn(
-                      "px-2 py-1 text-xs rounded-full",
-                      project.status === "Active" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
-                    )}>
-                      {project.status}
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                      {project.funded_amount ? "Funded" : "Pending"}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600">{project.agency}</p>
+                  <p className="text-sm text-gray-600">{project.funding_agency}</p>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Amount: {project.amount}</span>
-                    <span>Duration: {project.duration}</span>
+                    <span>Amount: ₹{project.funded_amount?.toLocaleString()}</span>
+                    <span>
+                      Duration: {format(new Date(project.duration_from), "yyyy")} - {format(new Date(project.duration_to), "yyyy")}
+                    </span>
                   </div>
+                  {project.sanction_letter_url && (
+                    <a
+                      href={project.sanction_letter_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      View Sanction Letter
+                    </a>
+                  )}
                 </div>
               ))}
               {projects.length === 0 && (

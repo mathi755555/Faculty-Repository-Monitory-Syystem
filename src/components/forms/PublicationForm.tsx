@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,16 +35,32 @@ const PublicationForm = () => {
 
   const [publications, setPublications] = useState<Publication[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchPublications();
+    checkAuthAndFetchData();
   }, []);
 
-  const fetchPublications = async () => {
+  const checkAuthAndFetchData = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setCurrentUser(null);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchPublications(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+    }
+  };
+
+  const fetchPublications = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('publications')
         .select('*')
+        .eq('user_id', userId) // Only fetch publications for this user
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -142,6 +157,17 @@ const PublicationForm = () => {
       setFormData({ ...formData, pdf: file });
     }
   };
+
+  // Show loading or authentication message if user is not loaded
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading your publications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
