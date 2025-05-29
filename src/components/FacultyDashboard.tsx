@@ -15,7 +15,8 @@ import {
   BookOpen,
   UserCheck,
   User,
-  Building2
+  Building2,
+  MessageSquare
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import FDPForm from "@/components/forms/FDPForm";
@@ -28,6 +29,7 @@ import TimetableForm from "@/components/forms/TimetableForm";
 import MembershipForm from "@/components/forms/MembershipForm";
 import StudentProjectForm from "@/components/forms/StudentProjectForm";
 import TeachingMaterialForm from "@/components/forms/TeachingMaterialForm";
+import FacultyRequests from "@/components/FacultyRequests";
 import { motion } from "framer-motion";
 
 interface FacultyDashboardProps {
@@ -241,6 +243,14 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       icon: BookOpen,
       color: "bg-lime-500",
       count: counts.teachingMaterials
+    },
+    {
+      id: "faculty-requests",
+      title: "Faculty Requests",
+      description: "Request access to faculty information",
+      icon: MessageSquare,
+      color: "bg-violet-500",
+      count: 0
     }
   ];
 
@@ -285,7 +295,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 lg:grid-cols-11 w-full">
+          <TabsList className="grid grid-cols-6 lg:grid-cols-12 w-full">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="fdp">FDP</TabsTrigger>
             <TabsTrigger value="publications">Publications</TabsTrigger>
@@ -297,6 +307,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
             <TabsTrigger value="membership">Membership</TabsTrigger>
             <TabsTrigger value="student-projects">Students</TabsTrigger>
             <TabsTrigger value="teaching-materials">Materials</TabsTrigger>
+            <TabsTrigger value="faculty-requests">Requests</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -377,6 +388,10 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
 
           <TabsContent value="teaching-materials">
             <TeachingMaterialForm />
+          </TabsContent>
+
+          <TabsContent value="faculty-requests">
+            <FacultyRequests />
           </TabsContent>
         </Tabs>
       </main>
